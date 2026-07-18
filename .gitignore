@@ -16,3 +16,6 @@ env/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Ignore trained model
+03_rain_in_australia_classification/models/rainfall_model.pkl
