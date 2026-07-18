@@ -481,7 +481,8 @@ def predict():
     return render_template("result.html", **result)
 
 
+import os
+
 if __name__ == "__main__":
-    # debug=True is convenient for local development; set to False (or
-    # use a production WSGI server such as gunicorn) when deploying.
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
