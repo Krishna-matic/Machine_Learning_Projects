@@ -14,3 +14,4 @@ pandas==3.0.2
 
 # Production WSGI server (optional, recommended for deployment)
 gunicorn==22.0.0
+requests

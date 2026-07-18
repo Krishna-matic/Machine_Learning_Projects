@@ -37,6 +37,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
+import requests
 
 import joblib
 import numpy as np
@@ -53,7 +54,29 @@ MODELS_DIR = BASE_DIR / "models"
 MODEL_PATH = MODELS_DIR / "rainfall_model.pkl"
 FEATURE_COLUMNS_PATH = MODELS_DIR / "feature_columns.pkl"
 FEATURE_DEFAULTS_PATH = MODELS_DIR / "feature_defaults.pkl"
+MODEL_URL = (
+    "https://huggingface.co/Krishnamatic/"
+    "rainfall-prediction-model/resolve/main/rainfall_model.pkl"
+)
+def download_model():
+    """Download the trained model from Hugging Face if it doesn't exist."""
 
+    if MODEL_PATH.exists():
+        return
+
+    print("Downloading rainfall model...")
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+    response = requests.get(MODEL_URL, stream=True)
+    response.raise_for_status()
+
+    with open(MODEL_PATH, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+
+    print("Model downloaded successfully.")
 # The nominal categorical columns that were one-hot encoded during
 # training (via `pd.get_dummies(..., drop_first=True)`). Any category
 # that has no matching "<column>_<value>" entry in `feature_columns.pkl`
@@ -127,18 +150,18 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------
 
 def _load_artifacts():
-    """Load the trained model and its companion preprocessing artifacts.
+    """Load the trained model and its companion preprocessing artifacts."""
 
-    Raises a clear, actionable error immediately at start-up if any file
-    is missing or inconsistent, rather than failing confusingly on the
-    first prediction request.
-    """
-    for path in (MODEL_PATH, FEATURE_COLUMNS_PATH, FEATURE_DEFAULTS_PATH):
+    # Download the model if it's missing
+    download_model()
+
+    # Only these two must already exist in GitHub
+    for path in (FEATURE_COLUMNS_PATH, FEATURE_DEFAULTS_PATH):
         if not path.exists():
             raise FileNotFoundError(
                 f"Required model artifact not found: {path}. "
-                "Make sure rainfall_model.pkl, feature_columns.pkl, and "
-                "feature_defaults.pkl all live in the 'models/' directory."
+                "Make sure feature_columns.pkl and feature_defaults.pkl "
+                "are present in the 'models/' directory."
             )
 
     model = joblib.load(MODEL_PATH)
@@ -150,9 +173,7 @@ def _load_artifacts():
         raise ValueError(
             f"Mismatch between the trained model and feature_columns.pkl: "
             f"model.n_features_in_ = {expected_features}, but "
-            f"feature_columns.pkl has {len(feature_columns)} entries. "
-            "Regenerate feature_columns.pkl from the same training run "
-            "that produced rainfall_model.pkl."
+            f"feature_columns.pkl has {len(feature_columns)} entries."
         )
 
     logger.info(
@@ -160,9 +181,8 @@ def _load_artifacts():
         expected_features if expected_features is not None else len(feature_columns),
         len(feature_columns),
     )
+
     return model, feature_columns, feature_defaults
-
-
 MODEL, FEATURE_COLUMNS, FEATURE_DEFAULTS = _load_artifacts()
 
 # The number of features the model expects, read directly from the
